@@ -1,0 +1,49 @@
+-----Compile the code to generate the executable-----
+$ g++ -O2 reference_checker.cpp -o analyzer 
+
+-----Word count query-----
+eg:1    $ ./analyzer --file test_logs.txt --version v1 --buffer 256 --query word --word error  
+        Version: v1
+        Count: 605079
+        Buffer Size (KB): 256
+        Execution Time (s): 1.31127
+
+eg:2    $ ./analyzer --file test_logs.txt --version v1 --buffer 256 --query word --word DEVOPs
+        Version: v1
+        Count: 1209558
+        Buffer Size (KB): 256
+        Execution Time (s): 1.29655
+
+eg:3    $ ./analyzer --file test_logs.txt --version v1 --buffer 256 --query word --word DEVOPS
+        Version: v1
+        Count: 1209558
+        Buffer Size (KB): 256
+        Execution Time (s): 1.48475
+
+-----Top-10 frequent words query-----
+$ ./analyzer --file test_logs.txt --version v1 --buffer 256 --query top --top 10
+Top-10 words in version v1:
+devops 1209558
+debug 605150
+error 605079
+info 604266
+warning 604149
+orderservice 484437
+paymentservice 484078
+authservice 483842
+searchservice 483162
+userservice 483125
+Buffer Size (KB): 256
+Execution Time (s): 1.30456
+
+-----Difference query-----
+eg:1    $ ./analyzer --file1 test_logs.txt --version1 v1 --file2 verbose_logs.txt --version2 v2 --buffer 256 --query diff --word error
+        Difference (v2 - v1): -495377
+        Buffer Size (KB): 256
+        Execution Time (s): 2.7623
+
+eg:2    $ ./analyzer --file1 test_logs.txt --version1 v1 --file2 verbose_logs.txt --version2 v2 --buffer 256 --query diff --word request
+        Difference (v2 - v1): -247648
+        Buffer Size (KB): 256
+        Execution Time (s): 2.71906
+    
