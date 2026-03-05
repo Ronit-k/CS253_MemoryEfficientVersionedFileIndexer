@@ -35,21 +35,23 @@
 #include <stdexcept>
 #include <chrono>
 #include <cctype>
+//####################################################################
+// PROGRESS BAR INCLUDE — only for visual progress display.        //#
+// Has nothing to do with the core logic of the program.           //#
+// Can be safely deleted without affecting functionality.          //#
+//####################################################################
+// Conditionally include the progress bar header.                  //################
+// If progressbar.h is not present, everything compiles and runs fine without it. ###
+#if __has_include("progressbar.h")                                 //################
+    #include "progressbar.h"                                       //#
+    #define HAS_PROGRESSBAR 1                                      //#
+#else                                                              //#
+    #define HAS_PROGRESSBAR 0                                      //#
+#endif                                                             //#
+//####################################################################
 
-// ///////////////////////////////////////////////////////////////////
-// PROGRESS BAR INCLUDE — only for visual progress display.        ///
-// Has nothing to do with the core logic of the program.           ///
-// Can be safely deleted without affecting functionality.          ///
-// ///////////////////////////////////////////////////////////////////
-// Conditionally include the progress bar header.                  ///
-// If progressbar.h is not present, everything compiles and runs as before.
-#if __has_include("progressbar.h")                                 ///
-    #include "progressbar.h"                                       ///
-    #define HAS_PROGRESSBAR 1                                      ///
-#else                                                              ///
-    #define HAS_PROGRESSBAR 0                                      ///
-#endif                                                             ///
-// ///////////////////////////////////////////////////////////////////
+
+
 
 using namespace std;
 
@@ -224,32 +226,32 @@ public:
         Tokenizer tokenizer;
         WordIndex<long long> idx;
 
-// ///////////////////////////////////////////////////////////////////
-// PROGRESS BAR SETUP — only for visual progress display.          ///
-// Has nothing to do with the core logic of the program.           ///
-// Can be safely deleted without affecting functionality.          ///
-// ///////////////////////////////////////////////////////////////////
-#if HAS_PROGRESSBAR                                                ///
-        // Determine file size for the progress bar                ///
-        size_t fileSize = 0;                                       ///
-        {                                                          ///
-            ifstream sizeCheck(filePath, ios::binary | ios::ate);  ///
-            if (sizeCheck.is_open())                               ///
-                fileSize = static_cast<size_t>(sizeCheck.tellg()); ///
-        }                                                          ///
-        ProgressBar progressBar(fileSize,"Indexing "+versionName); ///
-#endif                                                             /// 
-// ///////////////////////////////////////////////////////////////////
+//####################################################################
+// PROGRESS BAR SETUP — only for visual progress display.          //#
+// Has nothing to do with the core logic of the program.           //#
+// Can be safely deleted without affecting functionality.          //#
+//####################################################################
+#if HAS_PROGRESSBAR                                                //#
+        // Determine file size for the progress bar                //#
+        size_t fileSize = 0;                                       //#
+        {                                                          //#
+            ifstream sizeCheck(filePath, ios::binary | ios::ate);  //#
+            if (sizeCheck.is_open())                               //#
+                fileSize = static_cast<size_t>(sizeCheck.tellg()); //#
+        }                                                          //#
+        ProgressBar progressBar(fileSize,"Indexing "+versionName); //#
+#endif                                                             //# 
+//####################################################################
 
         while (reader.loadNextChunk()) {
-// ///////////////////////////////////////////////////////////////////
-// PROGRESS BAR UPDATE — only for visual progress display.         ///
-// Has nothing to do with the core logic of the program.           ///
-// Can be safely deleted without affecting functionality.          ///    
-#if HAS_PROGRESSBAR                                                ///
-            progressBar.update(reader.getBytesRead());             ///
-#endif                                                             ///
-// ///////////////////////////////////////////////////////////////////
+//####################################################################
+// PROGRESS BAR UPDATE — only for visual progress display.         //#
+// Has nothing to do with the core logic of the program.           //#
+// Can be safely deleted without affecting functionality.          //#    
+#if HAS_PROGRESSBAR                                                //#
+            progressBar.update(reader.getBytesRead());             //#
+#endif                                                             //#
+//####################################################################
             auto tokens = tokenizer.tokenize(
                 reader.getBuffer(),             // pointer to buffer data
                 reader.getBytesRead(),          // number of bytes loaded into the buffer
@@ -261,14 +263,14 @@ public:
             }
         }
 
-// ///////////////////////////////////////////////////////////////////
-// PROGRESS BAR FINISH — only for visual progress display.         /// 
-// Has nothing to do with the core logic of the program.           ///
-// Can be safely deleted without affecting functionality.          ///
-#if HAS_PROGRESSBAR                                                ///
-        progressBar.finish();                                      ///
-#endif                                                             /// 
-// ///////////////////////////////////////////////////////////////////
+//####################################################################
+// PROGRESS BAR FINISH — only for visual progress display.         //# 
+// Has nothing to do with the core logic of the program.           //#
+// Can be safely deleted without affecting functionality.          //#
+#if HAS_PROGRESSBAR                                                //#
+        progressBar.finish();                                      //#
+#endif                                                             //# 
+//####################################################################
 
         versions[versionName] = move(idx);
     }
@@ -434,7 +436,7 @@ int main(int argc, char* argv[]) {
             word = tokens.empty() ? "" : tokens[0];
         }
 
-        // --- Build indexes & create query (polymorphic via base class pointer) ---
+        // Build indexes & create query (polymorphic via base class pointer)
         VersionedIndex indexer;
         Query* query = nullptr;
 
