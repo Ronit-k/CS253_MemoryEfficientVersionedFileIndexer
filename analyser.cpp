@@ -397,7 +397,32 @@ public:
 };
 
 // ============================================================
-// Main – CLI parsing, index building, query dispatch
+// Helper – prompt for a missing string argument interactively
+// ============================================================
+static string promptIfEmpty(const string& value, const string& prompt) {
+    if (!value.empty()) return value;
+    string input;
+    cout << prompt;
+    getline(cin, input);
+    // trim leading/trailing whitespace
+    size_t s = input.find_first_not_of(" \t\r\n");
+    size_t e = input.find_last_not_of(" \t\r\n");
+    if (s == string::npos) return "";
+    return input.substr(s, e - s + 1);
+}
+
+// Helper – prompt for a missing integer argument interactively
+static int promptIntIfZero(int value, const string& prompt) {
+    if (value > 0) return value;
+    string input;
+    cout << prompt;
+    getline(cin, input);
+    return stoi(input);
+}
+
+// ============================================================
+// Main – CLI parsing, interactive prompts, index building,
+//        query dispatch
 // ============================================================
 int main(int argc, char* argv[]) {
     try {
@@ -429,6 +454,38 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // --- Interactively prompt for any missing arguments ---
+        // Query type is asked first because it determines which other args are needed
+        queryType = promptIfEmpty(queryType,
+            "Enter query type (word / diff / top): ");
+        if (queryType != "word" && queryType != "diff" && queryType != "top") {
+            throw invalid_argument(
+                "Query type must be 'word', 'diff', or 'top'. Given: " + queryType);
+        }
+
+        // Buffer size is needed for every query
+        bufferKB = promptIntIfZero(bufferKB,
+            "Enter buffer size in KB (256–1024): ");
+
+        // Prompt for query-specific arguments
+        if (queryType == "word" || queryType == "top") {
+            file    = promptIfEmpty(file,    "Enter file path (--file): ");
+            version = promptIfEmpty(version, "Enter version name (--version): ");
+
+            if (queryType == "word") {
+                word = promptIfEmpty(word, "Enter word to search (--word): ");
+            } else {  // top
+                topK = promptIntIfZero(topK, "Enter top-K value (--top): ");
+            }
+
+        } else {  // diff
+            file1    = promptIfEmpty(file1,    "Enter first file path (--file1): ");
+            version1 = promptIfEmpty(version1, "Enter first version name (--version1): ");
+            file2    = promptIfEmpty(file2,    "Enter second file path (--file2): ");
+            version2 = promptIfEmpty(version2, "Enter second version name (--version2): ");
+            word     = promptIfEmpty(word,     "Enter word to compare (--word): ");
+        }
+
         // Normalize the query word using the tokenizer's string overload (handles lowercasing + cleanup)
         if (!word.empty()) {
             Tokenizer normalizer;
@@ -436,7 +493,7 @@ int main(int argc, char* argv[]) {
             word = tokens.empty() ? "" : tokens[0];
         }
 
-        // Build indexes & create query (polymorphic via base class pointer)
+        // --- Validate & build indexes, create query (polymorphic via base class pointer) ---
         VersionedIndex indexer;
         Query* query = nullptr;
 
@@ -465,9 +522,6 @@ int main(int argc, char* argv[]) {
             indexer.buildIndex(version1, file1, bufferKB);
             indexer.buildIndex(version2, file2, bufferKB);
             query = new DiffQuery(indexer, version1, version2, word);
-
-        } else {
-            throw invalid_argument("Unknown query type: " + queryType);
         }
 
         // --- Execute via dynamic dispatch ---
