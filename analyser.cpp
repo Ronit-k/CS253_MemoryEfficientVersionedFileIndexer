@@ -426,7 +426,6 @@ static int promptIntIfZero(int value, const string& prompt) {
 // ============================================================
 int main(int argc, char* argv[]) {
     try {
-        auto startTime = chrono::high_resolution_clock::now();
 
         // --- Parse command-line arguments ---
         string file, file1, file2;
@@ -455,17 +454,16 @@ int main(int argc, char* argv[]) {
         }
 
         // --- Interactively prompt for any missing arguments ---
+
         // Query type is asked first because it determines which other args are needed
-        queryType = promptIfEmpty(queryType,
-            "Enter query type (word / diff / top): ");
+        queryType = promptIfEmpty(queryType, "Enter query type (word / diff / top): ");
         if (queryType != "word" && queryType != "diff" && queryType != "top") {
             throw invalid_argument(
                 "Query type must be 'word', 'diff', or 'top'. Given: " + queryType);
         }
 
         // Buffer size is needed for every query
-        bufferKB = promptIntIfZero(bufferKB,
-            "Enter buffer size in KB (256–1024): ");
+        bufferKB = promptIntIfZero(bufferKB, "Enter buffer size in KB (256–1024): ");
 
         // Prompt for query-specific arguments
         if (queryType == "word" || queryType == "top") {
@@ -474,17 +472,23 @@ int main(int argc, char* argv[]) {
 
             if (queryType == "word") {
                 word = promptIfEmpty(word, "Enter word to search (--word): ");
-            } else {  // top
+            } 
+            else {  // top
                 topK = promptIntIfZero(topK, "Enter top-K value (--top): ");
             }
 
-        } else {  // diff
+        } 
+        else {  // diff
             file1    = promptIfEmpty(file1,    "Enter first file path (--file1): ");
             version1 = promptIfEmpty(version1, "Enter first version name (--version1): ");
             file2    = promptIfEmpty(file2,    "Enter second file path (--file2): ");
             version2 = promptIfEmpty(version2, "Enter second version name (--version2): ");
             word     = promptIfEmpty(word,     "Enter word to compare (--word): ");
         }
+
+        // Now we have all the arguments we need, even if some were missing from the command line prompt, we interactively asked the user for them.
+        // Start timing AFTER all arguments are collected (so interactive prompts don't inflate the time)
+        auto startTime = chrono::high_resolution_clock::now();
 
         // Normalize the query word using the tokenizer's string overload (handles lowercasing + cleanup)
         if (!word.empty()) {
