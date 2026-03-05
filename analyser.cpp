@@ -1,6 +1,9 @@
 /*
  * Memory-Efficient Versioned File Indexer
  * CS253 Assignment 1
+ * Name: Ronit Kumar
+ * Roll No: 230875
+ * Mail ID: ronitk23@iitk.ac.in
  *
  * Builds a word-level index over large text files using a fixed-size buffer.
  * Supports word count, difference, and top-K queries across versioned files.
@@ -18,7 +21,7 @@
  * C++ features demonstrated:
  *   - Inheritance / abstract base class + 3 derived classes
  *   - Runtime polymorphism (virtual dispatch)
- *   - Function overloading (Tokenizer::tokenize, WordIndex::addWord)
+ *   - Function overloading (Tokenizer::tokenize)
  *   - Exception handling (try / catch / throw)
  *   - User-defined class template (WordIndex<CountType>)
  */
@@ -32,9 +35,6 @@
 #include <stdexcept>
 #include <chrono>
 #include <cctype>
-#include <cstring>
-#include <memory>
-#include <sstream>
 
 using namespace std;
 
@@ -43,20 +43,15 @@ using namespace std;
 // Stores word -> frequency mapping. Template parameter controls
 // the numeric type used for counts.
 // ============================================================
-template <typename CountType = long long>
+template <typename CountType = long long> //default to long long for large counts, but can be customized
 class WordIndex {
 private:
     unordered_map<string, CountType> index; //stores word frequencies in a unordered_map for O(1) average access
 
 public:
-    // --- Function overload 1: increment by 1 ---
+    // Adds a word to the index, incrementing its frequency by 1
     void addWord(const string& word) {
         index[word]++;
-    }
-
-    // --- Function overload 2: increment by arbitrary count ---
-    void addWord(const string& word, CountType count) {
-        index[word] += count;
     }
 
     // Returns the frequency of the word, or 0 if not found
@@ -95,15 +90,19 @@ private:
     bool fileEnded;
 
 public:
+    // Constructor definition
     BufferedFileReader(const string& filePath, size_t bufferSizeKB) {
+        // Exception handling for invalid buffer sizes
         if (bufferSizeKB < 256 || bufferSizeKB > 1024) {
             throw invalid_argument(
                 "Buffer size must be between 256 and 1024 KB. Given: "
                 + to_string(bufferSizeKB) + " KB");
         }
-        bufferSize = bufferSizeKB * 1024;
-        buffer = new char[bufferSize];
-        file.open(filePath, ios::binary);
+        bufferSize = bufferSizeKB * 1024; // Convert KB to bytes
+        buffer = new char[bufferSize];    // Allocate buffer of specified size
+        file.open(filePath, ios::binary); // Open file in binary mode
+
+        // Exception handling for file opening failure
         if (!file.is_open()) {
             delete[] buffer;
             throw runtime_error("Cannot open file: " + filePath);
@@ -111,32 +110,35 @@ public:
         bytesRead  = 0;
         fileEnded  = false;
     }
-
+    // Destructor definition
     ~BufferedFileReader() {
         delete[] buffer;
         if (file.is_open()) file.close();
     }
 
-    // Non-copyable
+    // Prevent copying: this class owns a raw pointer (buffer) and a file handle,
+    // so a shallow copy would cause double-free and duplicate file access.
     BufferedFileReader(const BufferedFileReader&)            = delete;
     BufferedFileReader& operator=(const BufferedFileReader&) = delete;
 
-    // Returns false when no more data is available
-    bool readNextChunk() {
+    // Loads the next chunk of raw bytes from the file into the buffer.
+    // Returns true if data was loaded, false if the file has been fully read and no more data was loaded.
+    // After a successful call, use getBuffer() and getBytesRead() to access the data.
+    bool loadNextChunk() {
         if (fileEnded) return false;
         file.read(buffer, static_cast<streamsize>(bufferSize));
         bytesRead = static_cast<size_t>(file.gcount());
-        if (bytesRead == 0) {
+        if (bytesRead == 0) { // no data loaded => end of file reached and nothing to read
             fileEnded = true;
             return false;
         }
-        if (bytesRead < bufferSize) fileEnded = true;
+        if (bytesRead < bufferSize) fileEnded = true; // less than buffer size data loaded => end of file reached
         return true;
     }
 
+    // Accessors for buffer data and status
     const char*  getBuffer()     const { return buffer; }
     size_t       getBytesRead()  const { return bytesRead; }
-    size_t       getBufferSize() const { return bufferSize; }
     bool         isFinished()    const { return fileEnded; }
 };
 
@@ -151,8 +153,7 @@ private:
     string partialToken;
 
 public:
-    // --- Overloaded tokenize (1): buffer + length ---
-    // isLastChunk = true flushes the partial token
+    // --- tokenize Function overload 1: buffer + length ---
     vector<string> tokenize(const char* data, size_t length, bool isLastChunk) {
         vector<string> tokens;
         string current = move(partialToken);
@@ -160,9 +161,11 @@ public:
 
         for (size_t i = 0; i < length; ++i) {
             unsigned char c = static_cast<unsigned char>(data[i]);
-            if (isalnum(c)) {
+
+            if (isalnum(c)) { // Alphanumeric character continues the current word
                 current += static_cast<char>(tolower(c));
-            } else {
+            } 
+            else { // Non-alphanumeric character ends the current word
                 if (!current.empty()) {
                     tokens.push_back(move(current));
                     current.clear();
@@ -170,6 +173,7 @@ public:
             }
         }
 
+        // If we ended with a partial word and this is not the last chunk, save it for the next call
         if (!current.empty()) {
             if (isLastChunk) {
                 tokens.push_back(move(current));
@@ -181,12 +185,10 @@ public:
         return tokens;
     }
 
-    // --- Overloaded tokenize (2): convenience for a whole string ---
+    // --- tokenize Function overload 2: A convenience wrapper. Calls overload 1 with: (pointer to the string's underlying char array, its length, true) ---
     vector<string> tokenize(const string& text) {
         return tokenize(text.c_str(), text.size(), true);
     }
-
-    void reset() { partialToken.clear(); }
 };
 
 // ============================================================
@@ -198,9 +200,7 @@ private:
     unordered_map<string, WordIndex<long long>> versions;
 
 public:
-    void buildIndex(const string& versionName,
-                    const string& filePath,
-                    size_t bufferSizeKB) {
+    void buildIndex(const string& versionName, const string& filePath, size_t bufferSizeKB) {
         if (versions.count(versionName)) {
             throw runtime_error("Version already exists: " + versionName);
         }
@@ -209,11 +209,13 @@ public:
         Tokenizer tokenizer;
         WordIndex<long long> idx;
 
-        while (reader.readNextChunk()) {
+        while (reader.loadNextChunk()) {
             auto tokens = tokenizer.tokenize(
-                reader.getBuffer(),
-                reader.getBytesRead(),
-                reader.isFinished());
+                reader.getBuffer(),             // pointer to buffer data
+                reader.getBytesRead(),          // number of bytes loaded into the buffer
+                reader.isFinished());           // whether this is the last chunk (end of file reached)
+
+            // Add all words/tokens from the list of words/tokens returned by the tokenizer
             for (const auto& tok : tokens) {
                 idx.addWord(tok);
             }
@@ -222,16 +224,13 @@ public:
         versions[versionName] = move(idx);
     }
 
-    const WordIndex<long long>& getVersion(const string& name) const {
-        auto it = versions.find(name);
+    // Returns a const reference to the WordIndex for the given version name.
+    const WordIndex<long long>& getWordIndex(const string& versionName) const {
+        auto it = versions.find(versionName);
         if (it == versions.end()) {
-            throw runtime_error("Version not found: " + name);
+            throw runtime_error("Version not found: " + versionName);
         }
         return it->second;
-    }
-
-    bool hasVersion(const string& name) const {
-        return versions.count(name) > 0;
     }
 };
 
@@ -243,14 +242,22 @@ public:
 // ============================================================
 class Query {
 protected:
-    VersionedIndex& indexer;
+    VersionedIndex& indexer; 
 
 public:
-    explicit Query(VersionedIndex& idx) : indexer(idx) {}
+    // Constructor that initializes the reference to the VersionedIndex and validates the query type
+    Query(VersionedIndex& idx, const string& queryType) : indexer(idx) {
+        if (queryType != "word" && queryType != "diff" && queryType != "top") {
+            throw invalid_argument(
+                "Query type must be 'word', 'diff', or 'top'. Given: " + queryType);
+        }
+    }
+    // Virtual destructor
     virtual ~Query() = default;
 
-    virtual void        execute()      const = 0;   // pure virtual
-    virtual string getQueryType() const = 0;   // pure virtual
+    // Pure virtual functions to execute the query. Must be overridden by derived classes.
+    virtual void        execute() const = 0;   
+    virtual string getQueryType() const = 0;
 };
 
 // ============================================================
@@ -263,24 +270,19 @@ private:
     string word;
 
 public:
-    WordCountQuery(VersionedIndex& idx,
-                   const string& ver,
-                   const string& w)
-        : Query(idx), version(ver), word(w) {}
+    WordCountQuery(VersionedIndex& idx, const string& ver, const string& w)
+                    : Query(idx, "word"), version(ver), word(w) {}
 
+    // Polymorphic execute() function that overrides the pure virtual function in the base class. Executes the word count query and prints the results.
     void execute() const override {
-        string lowerWord;
-        for (char c : word)
-            lowerWord += static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        // get the frequency count of the word in the specified version
+        long long count = indexer.getWordIndex(version).getCount(word);
 
-        const auto& idx = indexer.getVersion(version);
-        long long count = idx.getCount(lowerWord);
-
-        cout << "Version  : " << version  << "\n";
-        cout << "Word     : " << word      << "\n";
-        cout << "Frequency: " << count     << "\n";
+        cout << "Version: " << version << "\n";
+        cout << "Count: " << count << "\n";
     }
 
+    // Polymorphic getQueryType() function that overrides the pure virtual function in the base class. Returns the string "word" to indicate this is a word count query.
     string getQueryType() const override { return "word"; }
 };
 
@@ -296,33 +298,19 @@ private:
     string word;
 
 public:
-    DiffQuery(VersionedIndex& idx,
-              const string& v1,
-              const string& v2,
-              const string& w)
-        : Query(idx), version1(v1), version2(v2), word(w) {}
+    DiffQuery(VersionedIndex& idx,const string& v1,const string& v2,const string& w)
+                : Query(idx, "diff"), version1(v1), version2(v2), word(w) {}
 
+    // Polymorphic execute() function that overrides the pure virtual function in the base class. Executes the difference query and prints the results.
     void execute() const override {
-        string lowerWord;
-        for (char c : word)
-            lowerWord += static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        long long count1 = indexer.getWordIndex(version1).getCount(word);
+        long long count2 = indexer.getWordIndex(version2).getCount(word);
+        long long diff   = count2 - count1;
 
-        const auto& idx1 = indexer.getVersion(version1);
-        const auto& idx2 = indexer.getVersion(version2);
-
-        long long count1 = idx1.getCount(lowerWord);
-        long long count2 = idx2.getCount(lowerWord);
-        long long diff   = count1 - count2;
-
-        cout << "Version 1 : " << version1 << "\n";
-        cout << "Version 2 : " << version2 << "\n";
-        cout << "Word      : " << word      << "\n";
-        cout << "Frequency in " << version1 << ": " << count1 << "\n";
-        cout << "Frequency in " << version2 << ": " << count2 << "\n";
-        cout << "Difference (" << version1 << " - " << version2 << "): "
+        cout << "Difference (" << version2 << " - " << version1 << "): "
                   << diff << "\n";
     }
-
+    // Polymorphic getQueryType() function that overrides the pure virtual function in the base class. Returns the string "diff" to indicate this is a difference query.
     string getQueryType() const override { return "diff"; }
 };
 
@@ -337,27 +325,23 @@ private:
     int k;
 
 public:
-    TopKQuery(VersionedIndex& idx,
-              const string& ver,
-              int topK)
-        : Query(idx), version(ver), k(topK) {}
+    TopKQuery(VersionedIndex& idx,const string& ver,int topK)
+                : Query(idx, "top"), version(ver), k(topK) {}
 
+    // Polymorphic execute() function that overrides the pure virtual function in the base class. Executes the top-K query and prints the results.
     void execute() const override {
         if (k <= 0) {
             throw invalid_argument("Top-K value must be a positive integer");
         }
 
-        const auto& idx = indexer.getVersion(version);
-        auto topWords = idx.getTopK(k);
+        auto topWords = indexer.getWordIndex(version).getTopK(k);
 
-        cout << "Version: " << version << "\n";
-        cout << "Top " << k << " words:\n";
-        for (int i = 0; i < static_cast<int>(topWords.size()); ++i) {
-            cout << "  " << (i + 1) << ". " << topWords[i].first
-                      << " : " << topWords[i].second << "\n";
+        cout << "Top-" << k << " words in version " << version << ":\n";
+        for (int i = 0; i < static_cast<int>(topWords.size()); i++) {
+            cout << topWords[i].first << " " << topWords[i].second << "\n";
         }
     }
-
+    // Polymorphic getQueryType() function that overrides the pure virtual function in the base class. Returns the string "top" to indicate this is a top-K query.
     string getQueryType() const override { return "top"; }
 };
 
@@ -371,12 +355,12 @@ int main(int argc, char* argv[]) {
         // --- Parse command-line arguments ---
         string file, file1, file2;
         string version, version1, version2;
-        int         bufferKB  = 0;
+        int bufferKB = 0;
         string queryType;
         string word;
-        int         topK      = 0;
+        int topK = 0;
 
-        for (int i = 1; i < argc; ++i) {
+        for (int i = 1; i < argc; i++) {
             string arg = argv[i];
 
             if      (arg == "--file"     && i + 1 < argc) file     = argv[++i];
@@ -394,21 +378,16 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // --- Validate common inputs ---
-        if (bufferKB < 256 || bufferKB > 1024) {
-            throw invalid_argument(
-                "Buffer size must be between 256 and 1024 KB. Given: "
-                + to_string(bufferKB) + " KB");
+        // Normalize the query word using the tokenizer's string overload (handles lowercasing + cleanup)
+        if (!word.empty()) {
+            Tokenizer normalizer;
+            auto tokens = normalizer.tokenize(word);  // tokenize overload 2: string → lowercase tokens
+            word = tokens.empty() ? "" : tokens[0];
         }
 
-        if (queryType != "word" && queryType != "diff" && queryType != "top") {
-            throw invalid_argument(
-                "Query type must be 'word', 'diff', or 'top'. Given: " + queryType);
-        }
-
-        // --- Build indexes & create query (polymorphic) ---
+        // --- Build indexes & create query (polymorphic via base class pointer) ---
         VersionedIndex indexer;
-        unique_ptr<Query> query;
+        Query* query = nullptr;
 
         if (queryType == "word") {
             if (file.empty() || version.empty() || word.empty()) {
@@ -416,7 +395,7 @@ int main(int argc, char* argv[]) {
                     "Word query requires --file, --version, and --word");
             }
             indexer.buildIndex(version, file, bufferKB);
-            query = make_unique<WordCountQuery>(indexer, version, word);
+            query = new WordCountQuery(indexer, version, word);
 
         } else if (queryType == "top") {
             if (file.empty() || version.empty() || topK <= 0) {
@@ -424,7 +403,7 @@ int main(int argc, char* argv[]) {
                     "Top query requires --file, --version, and --top (positive integer)");
             }
             indexer.buildIndex(version, file, bufferKB);
-            query = make_unique<TopKQuery>(indexer, version, topK);
+            query = new TopKQuery(indexer, version, topK);
 
         } else if (queryType == "diff") {
             if (file1.empty() || file2.empty() ||
@@ -434,18 +413,21 @@ int main(int argc, char* argv[]) {
             }
             indexer.buildIndex(version1, file1, bufferKB);
             indexer.buildIndex(version2, file2, bufferKB);
-            query = make_unique<DiffQuery>(indexer, version1, version2, word);
+            query = new DiffQuery(indexer, version1, version2, word);
+
+        } else {
+            throw invalid_argument("Unknown query type: " + queryType);
         }
 
         // --- Execute via dynamic dispatch ---
-        cout << "===== Versioned File Indexer =====\n";
-        cout << "Query Type  : " << query->getQueryType() << "\n";
         query->execute();
-        cout << "Buffer Size : " << bufferKB << " KB\n";
+        cout << "Buffer Size (KB): " << bufferKB << "\n";
 
         auto endTime = chrono::high_resolution_clock::now();
         chrono::duration<double> elapsed = endTime - startTime;
-        cout << "Execution Time: " << elapsed.count() << " seconds\n";
+        cout << "Execution Time (s): " << elapsed.count() << "\n";
+
+        delete query;  // Manual cleanup — must not forget this
 
     } catch (const invalid_argument& e) {
         cerr << "Invalid argument: " << e.what() << endl;
