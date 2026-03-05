@@ -39,8 +39,8 @@ cd CS253_MemoryEfficientVersionedFileIndexer
 ### 2. Download sample data (~109 MB each)
 
 ```bash
-wget https://raw.githubusercontent.com/krishna-kumar-bais/CS253-Software-DevOps-Assignment1/main/test_logs.txt
-wget https://raw.githubusercontent.com/krishna-kumar-bais/CS253-Software-DevOps-Assignment1/main/verbose_logs.txt
+wget https://media.githubusercontent.com/media/krishna-kumar-bais/CS253-Software-DevOps-Assignment1/main/test_logs.txt
+wget https://media.githubusercontent.com/media/krishna-kumar-bais/CS253-Software-DevOps-Assignment1/main/verbose_logs.txt
 ```
 
 ### 3. Compile (requires C++17)
