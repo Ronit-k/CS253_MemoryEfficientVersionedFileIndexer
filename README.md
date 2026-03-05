@@ -72,10 +72,11 @@ g++ -std=c++17 -O2 -o analyzer analyser.cpp
 ./analyzer --file test_logs.txt --version v1 --buffer 512 --query word --word error
 ```
 ```
+Indexing v1 [########################################] 100%
 Version: v1
 Count: 605079
-Buffer Size (KB): 512
-Execution Time (s): 0.97436
+Buffer Size (KB): 256
+Execution Time (s): 1.02554
 ```
 
 ### Top-K Query
@@ -84,6 +85,7 @@ Execution Time (s): 0.97436
 ./analyzer --file test_logs.txt --version v1 --buffer 512 --query top --top 10
 ```
 ```
+Indexing v1 [########################################] 100%
 Top-10 words in version v1:
 devops 1209558
 debug 605150
@@ -95,8 +97,8 @@ paymentservice 484078
 authservice 483842
 searchservice 483162
 userservice 483125
-Buffer Size (KB): 512
-Execution Time (s): 0.97675
+Buffer Size (KB): 256
+Execution Time (s): 0.976015
 ```
 
 ### Diff Query
@@ -105,9 +107,11 @@ Execution Time (s): 0.97675
 ./analyzer --file1 test_logs.txt --file2 verbose_logs.txt --version1 v1 --version2 v2 --buffer 512 --query diff --word error
 ```
 ```
+Indexing v1 [########################################] 100%
+Indexing v2 [########################################] 100%
 Difference (v2 - v1): -495377
-Buffer Size (KB): 512
-Execution Time (s): 1.95398
+Buffer Size (KB): 256
+Execution Time (s): 1.9306
 ```
 
 ---
