@@ -17,13 +17,6 @@
  *     - WordCountQuery   : derived – single word frequency
  *     - DiffQuery        : derived – frequency difference between versions
  *     - TopKQuery        : derived – top K frequent words
- *
- * C++ features demonstrated:
- *   - Inheritance / abstract base class + 3 derived classes
- *   - Runtime polymorphism (virtual dispatch)
- *   - Function overloading (Tokenizer::tokenize)
- *   - Exception handling (try / catch / throw)
- *   - User-defined class template (WordIndex<CountType>)
  */
 
 #include <iostream>
@@ -63,24 +56,24 @@ using namespace std;
 template <typename CountType = long long> //default to long long for large counts, but can be customized
 class WordIndex {
 private:
-    unordered_map<string, CountType> index; //stores word frequencies in a unordered_map for O(1) average access
+    unordered_map<string, CountType> frequencyMap; //stores word frequencies in a unordered_map for O(1) average access
 
 public:
     // Adds a word to the index, incrementing its frequency by 1
     void addWord(const string& word) {
-        index[word]++;
+        frequencyMap[word]++;
     }
 
     // Returns the frequency of the word, or 0 if not found
     CountType getCount(const string& word) const {
-        auto it = index.find(word);
-        if (it != index.end()) return it->second;
+        auto it = frequencyMap.find(word);
+        if (it != frequencyMap.end()) return it->second;
         return 0;
     }
 
     // Returns a vector of the top-K most frequent words, sorted by frequency
     vector<pair<string, CountType>> getTopK(int k) const {
-        vector<pair<string, CountType>> entries(index.begin(), index.end());
+        vector<pair<string, CountType>> entries(frequencyMap.begin(), frequencyMap.end());
         // Sort descending by frequency; ties broken alphabetically
         sort(entries.begin(), entries.end(),
             [](const auto& a, const auto& b) {
@@ -103,7 +96,7 @@ private:
     ifstream file;
     char* buffer;
     size_t bufferSize;
-    size_t bytesRead;
+    size_t chunkBytesRead;
     bool fileEnded;
 
 public:
@@ -124,8 +117,8 @@ public:
             delete[] buffer;
             throw runtime_error("Cannot open file: " + filePath);
         }
-        bytesRead  = 0;
-        fileEnded  = false;
+        chunkBytesRead = 0;
+        fileEnded      = false;
     }
     // Destructor definition
     ~BufferedFileReader() {
@@ -144,19 +137,19 @@ public:
     bool loadNextChunk() {
         if (fileEnded) return false;
         file.read(buffer, static_cast<streamsize>(bufferSize));
-        bytesRead = static_cast<size_t>(file.gcount());
-        if (bytesRead == 0) { // no data loaded => end of file reached and nothing to read
+        chunkBytesRead = static_cast<size_t>(file.gcount());
+        if (chunkBytesRead == 0) { // no data loaded => end of file reached and nothing to read
             fileEnded = true;
             return false;
         }
-        if (bytesRead < bufferSize) fileEnded = true; // less than buffer size data loaded => end of file reached
+        if (chunkBytesRead < bufferSize) fileEnded = true; // less than buffer size data loaded => end of file reached
         return true;
     }
 
     // Accessors for buffer data and status
-    const char*  getBuffer()     const { return buffer; }
-    size_t       getBytesRead()  const { return bytesRead; }
-    bool         isFinished()    const { return fileEnded; }
+    const char*  getBuffer()         const { return buffer; }
+    size_t       getChunkBytesRead() const { return chunkBytesRead; }
+    bool         isFinished()        const { return fileEnded; }
 };
 
 // ============================================================
@@ -224,7 +217,7 @@ public:
 
         BufferedFileReader reader(filePath, bufferSizeKB);
         Tokenizer tokenizer;
-        WordIndex<long long> idx;
+        WordIndex<long long> wordIndex;
 
 //####################################################################
 // PROGRESS BAR SETUP — only for visual progress display.          //#
@@ -249,17 +242,17 @@ public:
 // Has nothing to do with the core logic of the program.           //#
 // Can be safely deleted without affecting functionality.          //#    
 #if HAS_PROGRESSBAR                                                //#
-            progressBar.update(reader.getBytesRead());             //#
+            progressBar.update(reader.getChunkBytesRead());        //#
 #endif                                                             //#
 //####################################################################
             auto tokens = tokenizer.tokenize(
-                reader.getBuffer(),             // pointer to buffer data
-                reader.getBytesRead(),          // number of bytes loaded into the buffer
-                reader.isFinished());           // whether this is the last chunk (end of file reached)
+                reader.getBuffer(),                 // pointer to buffer data
+                reader.getChunkBytesRead(),         // number of bytes loaded into the buffer
+                reader.isFinished());               // whether this is the last chunk (end of file reached)
 
             // Add all words/tokens from the list of words/tokens returned by the tokenizer
             for (const auto& tok : tokens) {
-                idx.addWord(tok);
+                wordIndex.addWord(tok);
             }
         }
 
@@ -272,7 +265,7 @@ public:
 #endif                                                             //# 
 //####################################################################
 
-        versions[versionName] = move(idx);
+        versions[versionName] = move(wordIndex);
     }
 
     // Returns a const reference to the WordIndex for the given version name.
@@ -293,11 +286,11 @@ public:
 // ============================================================
 class Query {
 protected:
-    VersionedIndex& indexer; 
+    VersionedIndex& versionedIndex; 
 
 public:
     // Constructor that initializes the reference to the VersionedIndex and validates the query type
-    Query(VersionedIndex& idx, const string& queryType) : indexer(idx) {
+    Query(VersionedIndex& vIdx, const string& queryType) : versionedIndex(vIdx) {
         if (queryType != "word" && queryType != "diff" && queryType != "top") {
             throw invalid_argument(
                 "Query type must be 'word', 'diff', or 'top'. Given: " + queryType);
@@ -321,13 +314,13 @@ private:
     string word;
 
 public:
-    WordCountQuery(VersionedIndex& idx, const string& ver, const string& w)
-                    : Query(idx, "word"), version(ver), word(w) {}
+    WordCountQuery(VersionedIndex& vIdx, const string& ver, const string& w)
+                    : Query(vIdx, "word"), version(ver), word(w) {}
 
     // Polymorphic execute() function that overrides the pure virtual function in the base class. Executes the word count query and prints the results.
     void execute() const override {
         // get the frequency count of the word in the specified version
-        long long count = indexer.getWordIndex(version).getCount(word);
+        long long count = versionedIndex.getWordIndex(version).getCount(word);
 
         cout << "Version: " << version << "\n";
         cout << "Count: " << count << "\n";
@@ -349,13 +342,13 @@ private:
     string word;
 
 public:
-    DiffQuery(VersionedIndex& idx,const string& v1,const string& v2,const string& w)
-                : Query(idx, "diff"), version1(v1), version2(v2), word(w) {}
+    DiffQuery(VersionedIndex& vIdx,const string& v1,const string& v2,const string& w)
+                : Query(vIdx, "diff"), version1(v1), version2(v2), word(w) {}
 
     // Polymorphic execute() function that overrides the pure virtual function in the base class. Executes the difference query and prints the results.
     void execute() const override {
-        long long count1 = indexer.getWordIndex(version1).getCount(word);
-        long long count2 = indexer.getWordIndex(version2).getCount(word);
+        long long count1 = versionedIndex.getWordIndex(version1).getCount(word);
+        long long count2 = versionedIndex.getWordIndex(version2).getCount(word);
         long long diff   = count2 - count1;
 
         cout << "Difference (" << version2 << " - " << version1 << "): "
@@ -376,8 +369,8 @@ private:
     int k;
 
 public:
-    TopKQuery(VersionedIndex& idx,const string& ver,int topK)
-                : Query(idx, "top"), version(ver), k(topK) {}
+    TopKQuery(VersionedIndex& vIdx,const string& ver,int topK)
+                : Query(vIdx, "top"), version(ver), k(topK) {}
 
     // Polymorphic execute() function that overrides the pure virtual function in the base class. Executes the top-K query and prints the results.
     void execute() const override {
@@ -385,7 +378,7 @@ public:
             throw invalid_argument("Top-K value must be a positive integer");
         }
 
-        auto topWords = indexer.getWordIndex(version).getTopK(k);
+        auto topWords = versionedIndex.getWordIndex(version).getTopK(k);
 
         cout << "Top-" << k << " words in version " << version << ":\n";
         for (int i = 0; i < static_cast<int>(topWords.size()); i++) {
@@ -492,8 +485,8 @@ int main(int argc, char* argv[]) {
 
         // Normalize the query word using the tokenizer's string overload (handles lowercasing + cleanup)
         if (!word.empty()) {
-            Tokenizer normalizer;
-            auto tokens = normalizer.tokenize(word);  // tokenize overload 2: string → lowercase tokens
+            Tokenizer tokenizer;
+            auto tokens = tokenizer.tokenize(word);  // tokenize overload 2: string → lowercase tokens
             word = tokens.empty() ? "" : tokens[0];
         }
 
