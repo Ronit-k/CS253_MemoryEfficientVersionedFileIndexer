@@ -136,7 +136,7 @@ public:
     // After a successful call, use getBuffer() and getBytesRead() to access the data.
     bool loadNextChunk() {
         if (fileEnded) return false;
-        file.read(buffer, static_cast<streamsize>(bufferSize));
+    file.read(buffer, static_cast<streamsize>(bufferSize)); // Read next chunk into buffer - MAIN OPERATION THAT KEEPS MEMORY USAGE ~CONSTANT 
         chunkBytesRead = static_cast<size_t>(file.gcount());
         if (chunkBytesRead == 0) { // no data loaded => end of file reached and nothing to read
             fileEnded = true;
